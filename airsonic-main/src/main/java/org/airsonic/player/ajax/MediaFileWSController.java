@@ -118,6 +118,7 @@ public class MediaFileWSController {
                 .concat(Optional.ofNullable(paths).orElse(Collections.emptyList()).parallelStream().map(mediaFileService::getMediaFile),
                         Optional.ofNullable(ids).orElse(Collections.emptyList()).parallelStream().map(mediaFileService::getMediaFile))
                 .filter(Objects::nonNull)
+                .filter(x -> mediaFileService.show(x))
                 .collect(Collectors.toList());
     }
 
@@ -154,7 +155,7 @@ public class MediaFileWSController {
             if (mediaFile.isFile()) {
                 mediaFile = mediaFileService.getParentOf(mediaFile);
             }
-            result.addAll(mediaFileService.getChildrenOf(mediaFile, true, true, true));
+            result.addAll(mediaFileService.getChildrenOf(mediaFile, true, true, true).stream().filter(x -> mediaFileService.show(x)).collect(Collectors.toList()));
         }
         return new ArrayList<>(result);
     }

@@ -661,7 +661,9 @@ public class SubsonicRESTController {
         }
 
         for (MediaFile child : mediaFileService.getChildrenOf(dir, true, true, true)) {
-            directory.getChild().add(createJaxbChild(player, child, username));
+            if (mediaFileService.show(child)) {
+                directory.getChild().add(createJaxbChild(player, child, username));
+            }
         }
 
         Response res = createResponse();

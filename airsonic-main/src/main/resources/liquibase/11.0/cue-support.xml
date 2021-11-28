@@ -1,0 +1,49 @@
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+    <changeSet id="startposition_001" author="yetangitu">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="media_file" columnName="start_position" />
+            </not>
+        </preConditions>
+        <addColumn tableName="media_file">
+            <column name="start_position" afterColumn="type" type="double" defaultValueNumeric="-1.0">
+                <constraints nullable="false" />
+            </column>
+        </addColumn>
+    </changeSet>
+    <changeSet id="dropuniqueindexfolderpath_001" author="yetangitu">
+        <dropIndex tableName="media_file" indexName="idx_media_file_folder_path" />
+        <rollback>
+            <createIndex tableName="media_file" unique="true" indexName="idx_media_file_folder_path">
+                <column name="folder_id"></column>
+                <column name="path"></column>
+            </createIndex>
+        </rollback>
+    </changeSet>
+    <changeSet id="adduniqueindexfolderpathstartposition_001" author="yetangitu">
+        <createIndex tableName="media_file" indexName="idx_media_file_folder_path_start_position" unique="true">
+            <column name="folder_id"/>
+            <column name="path"/>
+            <column name="start_position"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="media_file" indexName="idx_media_file_folder_path_start_position" />
+        </rollback>
+    </changeSet>
+    <changeSet id="indexpath_001" author="yetangitu">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="media_file" columnName="index_path" />
+            </not>
+        </preConditions>
+        <addColumn tableName="media_file">
+            <column name="index_path" afterColumn="parent_path" type="${varchar_type}" />
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="media_file" columnName="index_path"></dropColumn>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>
