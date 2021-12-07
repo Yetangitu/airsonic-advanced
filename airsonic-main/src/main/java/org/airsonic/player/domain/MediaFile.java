@@ -42,7 +42,7 @@ public class MediaFile {
     private String path;
     private Integer folderId;
     private MediaType mediaType;
-    private Double startPosition = NOTINDEXED; // i.e. not an indexed track
+    private Double startPosition = NOT_INDEXED; // i.e. not an indexed track
     private String format;
     private String title;
     private String albumName;
@@ -500,7 +500,7 @@ public class MediaFile {
         return from -> from.getId();
     }
 
-    public static final double NOTINDEXED = -1.0;
+    public static final double NOT_INDEXED = -1.0;
 
     public static enum MediaType {
         MUSIC,

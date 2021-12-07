@@ -68,7 +68,7 @@ public class MediaFileDao extends AbstractDao {
     }
 
     public MediaFile getMediaFile(String path, int folderId) {
-        return getMediaFile(path, folderId, MediaFile.NOTINDEXED);
+        return getMediaFile(path, folderId, MediaFile.NOT_INDEXED);
     }
 
     public MediaFile getMediaFile(int id) {
