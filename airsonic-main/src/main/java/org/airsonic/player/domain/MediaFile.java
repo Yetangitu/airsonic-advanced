@@ -42,7 +42,7 @@ public class MediaFile {
     private String path;
     private Integer folderId;
     private MediaType mediaType;
-    private Double startPosition = notIndexed; // i.e. not an indexed track
+    private Double startPosition = NOTINDEXED; // i.e. not an indexed track
     private String format;
     private String title;
     private String albumName;
@@ -143,7 +143,7 @@ public class MediaFile {
     }
 
     public Path getRelativePath() {
-        return path == null ? null : Paths.get(path);
+        return Paths.get(path);
     }
 
     public Path getFullPath(Path relativeMediaFolderPath) {
@@ -251,7 +251,7 @@ public class MediaFile {
     }
 
     public String getName() {
-        return title != null ? title : FilenameUtils.getBaseName(path);
+        return title != null ? title : isDirectory() ? FilenameUtils.getName(path) : FilenameUtils.getBaseName(path);
     }
 
     public Integer getDiscNumber() {
@@ -500,7 +500,7 @@ public class MediaFile {
         return from -> from.getId();
     }
 
-    public static Double notIndexed = -1.0;
+    public static final double NOTINDEXED = -1.0;
 
     public static enum MediaType {
         MUSIC,

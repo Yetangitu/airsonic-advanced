@@ -174,6 +174,20 @@ public class MediaFileService {
     }
 
     /**
+     * Returns all user-visible media files that are children of a given media file
+     *
+     * visibility depends on the return value of showMediaFile(mediaFile)
+     *
+     * @param sort               Whether to sort files in the same directory
+     * @return All children media files which pass this::showMediaFile
+     */
+    public List<MediaFile> getVisibleChildrenOf(MediaFile parent, boolean includeDirectories, boolean sort) {
+        return getChildrenOf(parent, true, includeDirectories, sort, settingsService.isFastCacheEnabled()).stream()
+                .filter(this::showMediaFile)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Returns all media files that are children of a given media file.
      *
      * @param includeFiles       Whether files should be included in the result.
@@ -441,13 +455,8 @@ public class MediaFileService {
     /**
      * hide specific file types in player and API
      */
-    public boolean show(MediaFile media) {
-        // should indexed files be hidden?
-        if (settingsService.getHideIndexedFiles() && media.hasIndex()) {
-            return false;
-        }
-
-        return true;
+    public boolean showMediaFile(MediaFile media) {
+        return !(settingsService.getHideIndexedFiles() && media.hasIndex());
     }
 
     public boolean includeMediaFile(MediaFile candidate, MusicFolder folder) {
@@ -664,7 +673,8 @@ public class MediaFileService {
                 String format = StringUtils.trimToNull(StringUtils.lowerCase(FilenameUtils.getExtension(audioFile.toString())));
                 mediaFile.setFormat(format);
 
-                Position currentPosition = cueSheet.getAllTrackData().get(i).getIndices().get(0).getPosition();
+                Position currentPosition = trackData.getIndices().get(0).getPosition();
+                // convert CUE timestamp (minutes:seconds:frames, 75 frames/second) to fractional seconds
                 double currentStart = currentPosition.getMinutes() * 60 + currentPosition.getSeconds() + (currentPosition.getFrames() / 75);
                 mediaFile.setStartPosition(currentStart);
 
@@ -725,19 +735,21 @@ public class MediaFileService {
         return memoryCacheEnabled;
     }
 
+    /**
+     * Returns an Optional Path to a CUE file for the given media file
+     * matches on file name minus extension
+     */
     private Optional<Path> getCuePath(Path path, MusicFolder folder) {
         Path resolvedPath = folder.getPath().resolve(path);
         Optional<Path> result = Optional.empty();
-        if (Files.isRegularFile(resolvedPath)) {
-            try (Stream<Path> list = Files.list(resolvedPath.getParent())) {
-                result = list
-                    .filter(p -> !Files.isDirectory(p))
-                    .filter(f -> "cue".equalsIgnoreCase(FilenameUtils.getExtension(f.toString()))
-                                 && FilenameUtils.getBaseName(f.toString()).equals(FilenameUtils.getBaseName(resolvedPath.toString())))
-                    .findFirst();
-            } catch (IOException e) {
-                LOG.warn("getCuePath {} {}", path, folder, e);
-            }
+        try (Stream<Path> list = Files.list(resolvedPath.getParent())) {
+            result = list
+                .filter(p -> !Files.isDirectory(p))
+                .filter(f -> "cue".equalsIgnoreCase(FilenameUtils.getExtension(f.toString()))
+                             && FilenameUtils.getBaseName(f.toString()).equals(FilenameUtils.getBaseName(resolvedPath.toString())))
+                .findFirst();
+        } catch (IOException e) {
+            LOG.warn("getCuePath {} {}", path, folder, e);
         }
 
         return result;
