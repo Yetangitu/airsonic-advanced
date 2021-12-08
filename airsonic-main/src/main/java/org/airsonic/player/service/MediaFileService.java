@@ -40,6 +40,7 @@ import org.digitalmediaserver.cuelib.CueParser;
 import org.digitalmediaserver.cuelib.CueSheet;
 import org.digitalmediaserver.cuelib.Position;
 import org.digitalmediaserver.cuelib.TrackData;
+import org.digitalmediaserver.cuelib.io.FLACReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -624,77 +625,62 @@ public class MediaFileService {
                 wholeFileLength = (metaData.getDuration() != null) ? metaData.getDuration() : 0.0;
             }
 
-            // attempt to detect encoding for cueFile, fallback to UTF-8
-            Charset cs = null;
-            int threshold = 35; // 0-100, the higher the more certain the guess
-            CharsetDetector cd = new CharsetDetector();
-            try (FileInputStream fis = new FileInputStream(media.getFullIndexPath(folder.getPath()).toFile());
-                 BufferedInputStream bis = new BufferedInputStream(fis);) {
-                cd.setText(bis);
-                CharsetMatch cm = cd.detect();
-                if (cm != null && cm.getConfidence() > threshold) {
-                    cs = Charset.forName(cm.getName());
-                } else {
-                    cs = Charset.forName("UTF-8");
+            CueSheet cueSheet = getCueSheet(media, folder);
+            if (cueSheet != null) {
+                for (int i = 0; i < cueSheet.getAllTrackData().size(); i++) {
+                    TrackData trackData = cueSheet.getAllTrackData().get(i);
+                    MediaFile mediaFile = new MediaFile();
+                    mediaFile.setPath(media.getPath().toString());
+                    mediaFile.setAlbumArtist(cueSheet.getPerformer());
+                    mediaFile.setAlbumName(cueSheet.getTitle());
+                    mediaFile.setTitle(trackData.getTitle());
+                    mediaFile.setArtist(trackData.getPerformer());
+                    mediaFile.setParentPath(media.getParentPath());
+                    Instant lastModified = FileUtil.lastModified(audioFile);
+                    mediaFile.setFolderId(media.getFolderId());
+                    mediaFile.setChanged(lastModified);
+                    mediaFile.setLastScanned(Instant.now());
+                    mediaFile.setChildrenLastUpdated(Instant.ofEpochMilli(1)); //distant past
+                    mediaFile.setCreated(lastModified);
+                    mediaFile.setPresent(true);
+                    mediaFile.setTrackNumber(trackData.getNumber());
+
+                    if (metaData != null) {
+                        mediaFile.setDiscNumber(metaData.getDiscNumber());
+                        mediaFile.setGenre(metaData.getGenre());
+                        mediaFile.setYear(metaData.getYear());
+                        mediaFile.setBitRate(metaData.getBitRate());
+                        mediaFile.setVariableBitRate(metaData.getVariableBitRate());
+                        mediaFile.setHeight(metaData.getHeight());
+                        mediaFile.setWidth(metaData.getWidth());
+                    }
+
+                    String format = StringUtils.trimToNull(StringUtils.lowerCase(FilenameUtils.getExtension(audioFile.toString())));
+                    mediaFile.setFormat(format);
+
+                    Position currentPosition = trackData.getIndices().get(0).getPosition();
+                    // convert CUE timestamp (minutes:seconds:frames, 75 frames/second) to fractional seconds
+                    double currentStart = currentPosition.getMinutes() * 60 + currentPosition.getSeconds() + (currentPosition.getFrames() / 75);
+                    mediaFile.setStartPosition(currentStart);
+
+                    double nextStart = 0.0;
+                    if (cueSheet.getAllTrackData().size() - 1 != i) {
+                        Position nextPosition = cueSheet.getAllTrackData().get(i + 1).getIndices().get(0).getPosition();
+                        nextStart = nextPosition.getMinutes() * 60 + nextPosition.getSeconds() + (nextPosition.getFrames() / 75);
+                    } else {
+                        nextStart = wholeFileLength;
+                    }
+
+                    mediaFile.setDuration(nextStart - currentStart);
+                    mediaFile.setFileSize((long) (mediaFile.getDuration() / wholeFileLength * wholeFileSize)); //approximate
+                    MediaFile existingFile = mediaFileDao.getMediaFile(mediaFile.getPath(), folder.getId(), currentStart);
+                    mediaFile.setPlayCount(existingFile == null ? 0 : existingFile.getPlayCount());
+                    mediaFile.setLastPlayed(existingFile == null ? null : existingFile.getLastPlayed());
+                    mediaFile.setComment(existingFile == null ? null : existingFile.getComment());
+                    mediaFile.setMediaType(getMediaType(mediaFile, folder));
+
+                    children.add(mediaFile);
                 }
-            } catch (IOException e) {
-                // use UTF-8 fallback
-                cs = Charset.forName("UTF-8");
-            }
-            CueSheet cueSheet = CueParser.parse(media.getFullIndexPath(folder.getPath()), cs);
-            for (int i = 0; i < cueSheet.getAllTrackData().size(); i++) {
-                TrackData trackData = cueSheet.getAllTrackData().get(i);
-                MediaFile mediaFile = new MediaFile();
-                mediaFile.setPath(media.getPath().toString());
-                mediaFile.setAlbumArtist(cueSheet.getPerformer());
-                mediaFile.setAlbumName(cueSheet.getTitle());
-                mediaFile.setTitle(trackData.getTitle());
-                mediaFile.setArtist(trackData.getPerformer());
-                mediaFile.setParentPath(media.getParentPath());
-                Instant lastModified = FileUtil.lastModified(audioFile);
-                mediaFile.setFolderId(media.getFolderId());
-                mediaFile.setChanged(lastModified);
-                mediaFile.setLastScanned(Instant.now());
-                mediaFile.setChildrenLastUpdated(Instant.ofEpochMilli(1)); //distant past
-                mediaFile.setCreated(lastModified);
-                mediaFile.setPresent(true);
-                mediaFile.setTrackNumber(trackData.getNumber());
-
-                if (metaData != null) {
-                    mediaFile.setDiscNumber(metaData.getDiscNumber());
-                    mediaFile.setGenre(metaData.getGenre());
-                    mediaFile.setYear(metaData.getYear());
-                    mediaFile.setBitRate(metaData.getBitRate());
-                    mediaFile.setVariableBitRate(metaData.getVariableBitRate());
-                    mediaFile.setHeight(metaData.getHeight());
-                    mediaFile.setWidth(metaData.getWidth());
-                }
-
-                String format = StringUtils.trimToNull(StringUtils.lowerCase(FilenameUtils.getExtension(audioFile.toString())));
-                mediaFile.setFormat(format);
-
-                Position currentPosition = trackData.getIndices().get(0).getPosition();
-                // convert CUE timestamp (minutes:seconds:frames, 75 frames/second) to fractional seconds
-                double currentStart = currentPosition.getMinutes() * 60 + currentPosition.getSeconds() + (currentPosition.getFrames() / 75);
-                mediaFile.setStartPosition(currentStart);
-
-                double nextStart = 0.0;
-                if (cueSheet.getAllTrackData().size() - 1 != i) {
-                    Position nextPosition = cueSheet.getAllTrackData().get(i + 1).getIndices().get(0).getPosition();
-                    nextStart = nextPosition.getMinutes() * 60 + nextPosition.getSeconds() + (nextPosition.getFrames() / 75);
-                } else {
-                    nextStart = wholeFileLength;
-                }
-
-                mediaFile.setDuration(nextStart - currentStart);
-                mediaFile.setFileSize((long) (mediaFile.getDuration() / wholeFileLength * wholeFileSize)); //approximate
-                MediaFile existingFile = mediaFileDao.getMediaFile(mediaFile.getPath(), folder.getId(), currentStart);
-                mediaFile.setPlayCount(existingFile == null ? 0 : existingFile.getPlayCount());
-                mediaFile.setLastPlayed(existingFile == null ? null : existingFile.getLastPlayed());
-                mediaFile.setComment(existingFile == null ? null : existingFile.getComment());
-                mediaFile.setMediaType(getMediaType(mediaFile, folder));
-
-                children.add(mediaFile);
             }
             return children;
         } catch (IOException e) {
@@ -714,7 +700,9 @@ public class MediaFileService {
         if (path.contains("podcast") || genre.contains("podcast") || path.contains("netcast") || genre.contains("netcast")) {
             return MediaFile.MediaType.PODCAST;
         }
-        if (path.contains("audiobook") || genre.contains("audiobook") || path.contains("audio book") || genre.contains("audio book") || path.contains("audio/book") || path.contains("audio\\book")) {
+        if (path.contains("audiobook") || genre.contains("audiobook")
+                || path.contains("audio book") || genre.contains("audio book")
+                || path.contains("audio/book") || path.contains("audio\\book")) {
             return MediaFile.MediaType.AUDIOBOOK;
         }
 
@@ -738,21 +726,63 @@ public class MediaFileService {
     /**
      * Returns an Optional Path to a CUE file for the given media file
      * matches on file name minus extension
+     * if no separate CUE file is found it looks for an embedded cuesheet (currently only supports FLAC) and
+     * returns the resolvedPath for the mediaFile if one is found
      */
     private Optional<Path> getCuePath(Path path, MusicFolder folder) {
         Path resolvedPath = folder.getPath().resolve(path);
         Optional<Path> result = Optional.empty();
+
         try (Stream<Path> list = Files.list(resolvedPath.getParent())) {
             result = list
                 .filter(p -> !Files.isDirectory(p))
                 .filter(f -> "cue".equalsIgnoreCase(FilenameUtils.getExtension(f.toString()))
                              && FilenameUtils.getBaseName(f.toString()).equals(FilenameUtils.getBaseName(resolvedPath.toString())))
                 .findFirst();
+
+            // look for embedded cuesheet in FLAC
+            if (result.isEmpty() && ("flac".equalsIgnoreCase(FilenameUtils.getExtension(resolvedPath.toString())) && (FLACReader.getCueSheet(resolvedPath) != null))) {
+                result = Optional.of(resolvedPath);
+            }
         } catch (IOException e) {
             LOG.warn("getCuePath {} {}", path, folder, e);
         }
 
         return result;
+    }
+
+    /**
+     * Returns a parsed CueSheet for the given mediaFile
+     */
+    private CueSheet getCueSheet(MediaFile media, MusicFolder folder) {
+        try {
+            // is this an embedded cuesheet (currently only supports FLAC+CUE)?
+            if (Objects.equals(media.getIndexPath(), media.getPath())) {
+                return FLACReader.getCueSheet(media.getFullPath(folder.getPath()));
+            } else {
+                Charset cs = Charset.forName("UTF-8"); // default to UTF-8
+                Path indexPath = media.getFullIndexPath(folder.getPath());
+
+                // attempt to detect encoding for cueFile, fallback to UTF-8
+                int THRESHOLD = 35; // 0-100, the higher the more certain the guess
+                CharsetDetector cd = new CharsetDetector();
+                try (FileInputStream fis = new FileInputStream(indexPath.toFile());
+                     BufferedInputStream bis = new BufferedInputStream(fis);) {
+                    cd.setText(bis);
+                    CharsetMatch cm = cd.detect();
+                    if (cm != null && cm.getConfidence() > THRESHOLD) {
+                        cs = Charset.forName(cm.getName());
+                    }
+                } catch (IOException e) {
+                    LOG.warn("Defaulting to UTF-8 for cuesheet {}", indexPath);
+                }
+
+                return CueParser.parse(indexPath, cs);
+            }
+        } catch (IOException e) {
+            LOG.warn("Error getting cuesheet for {} {}", media, folder);
+            return null;
+        }
     }
 
     /**
