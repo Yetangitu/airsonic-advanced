@@ -102,6 +102,7 @@ public class SettingsService {
     private static final String KEY_PODCAST_EPISODE_DOWNLOAD_COUNT = "PodcastEpisodeDownloadCount";
     private static final String KEY_DOWNLOAD_BITRATE_LIMIT = "DownloadBitrateLimit";
     private static final String KEY_UPLOAD_BITRATE_LIMIT = "UploadBitrateLimit";
+    private static final String KEY_SPLIT_OPTIONS = "SplitOptions";
     private static final String KEY_SPLIT_COMMAND = "SplitCommand";
     private static final String KEY_DOWNSAMPLING_COMMAND = "DownsamplingCommand4";
     private static final String KEY_HLS_COMMAND = "HlsCommand4";
@@ -205,8 +206,9 @@ public class SettingsService {
     private static final int DEFAULT_PODCAST_EPISODE_DOWNLOAD_COUNT = 1;
     private static final long DEFAULT_DOWNLOAD_BITRATE_LIMIT = 0;
     private static final long DEFAULT_UPLOAD_BITRATE_LIMIT = 0;
-    private static final String DEFAULT_SPLIT_COMMAND = "ffmpeg -ss %o -t %d -i %s -vcodec copy -acodec copy -f %f -";
-    private static final String DEFAULT_DOWNSAMPLING_COMMAND = "ffmpeg -i %s -map 0:0 -b:a %bk -v 0 -f mp3 -";
+    private static final String DEFAULT_SPLIT_OPTIONS = "-ss %o -t %d";
+    private static final String DEFAULT_SPLIT_COMMAND = "ffmpeg %S -i %s -vcodec copy -acodec copy -f %f -";
+    private static final String DEFAULT_DOWNSAMPLING_COMMAND = "ffmpeg %S -i %s -map 0:0 -b:a %bk -v 0 -f mp3 -";
     private static final String DEFAULT_HLS_COMMAND = "ffmpeg -ss %o -i %s -s %wx%h -async 1 -c:v libx264 -flags +cgop -b:v %vk -maxrate %bk -preset superfast -copyts -b:a %rk -bufsize 256k -map 0:0 -map 0:%i -ac 2 -ar 44100 -v 0 -threads 0 -force_key_frames expr:gte(t,n_forced*10) -start_number %j -hls_time %d -hls_list_size 0 -hls_segment_filename %n %p";
     private static final String DEFAULT_JUKEBOX_COMMAND = "ffmpeg -ss %o -i %s -map 0:0 -v 0 -ar 44100 -ac 2 -f s16be -";
     private static final String DEFAULT_VIDEO_IMAGE_COMMAND = "ffmpeg -r 1 -ss %o -t 1 -i %s -s %wx%h -v 0 -f mjpeg -";
@@ -926,6 +928,14 @@ public class SettingsService {
     public void setUploadBitrateLimit(long limit) {
         setLong(KEY_UPLOAD_BITRATE_LIMIT, limit);
         getUploadBitrateLimiter().setRate(adjustBitrateLimit(limit));
+    }
+
+    public String getSplitOptions() {
+        return getProperty(KEY_SPLIT_OPTIONS, DEFAULT_SPLIT_OPTIONS);
+    }
+
+    public void setSplitOptions(String options) {
+        setProperty(KEY_SPLIT_OPTIONS, options);
     }
 
     public String getSplitCommand() {

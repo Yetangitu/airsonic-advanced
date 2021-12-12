@@ -19,7 +19,6 @@
  */
 package org.airsonic.player.service;
 
-import com.google.common.io.MoreFiles;
 import com.ibm.icu.text.CharsetDetector;
 import com.ibm.icu.text.CharsetMatch;
 import org.airsonic.player.ajax.MediaFileEntry;
@@ -465,7 +464,7 @@ public class MediaFileService {
     }
 
     public boolean includeMediaFile(Path candidate) {
-        String suffix = MoreFiles.getFileExtension(candidate).toLowerCase();
+        String suffix = FilenameUtils.getExtension(candidate.toString()).toLowerCase();
         return (!isExcluded(candidate) && (Files.isDirectory(candidate) || isAudioFile(suffix) || isVideoFile(suffix)));
     }
 
