@@ -473,7 +473,7 @@ public class MediaFile {
         } else if (!path.equals(other.path)) {
             return false;
         }
-        if (!folderId.equals(other.folderId))
+        if (!folderId.equals(other.folderId)) {
             return false;
         }
         if (!startPosition.equals(other.startPosition)) {

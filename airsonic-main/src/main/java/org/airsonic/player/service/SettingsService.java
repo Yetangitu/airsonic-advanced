@@ -277,8 +277,6 @@ public class SettingsService {
     private Set<String> cachedMusicFileTypes;
     private Set<String> cachedVideoFileTypes;
     private Set<String> cachedPlayableFileTypes;
-    private List<MusicFolder> cachedMusicFolders;
-    private final ConcurrentMap<String, List<MusicFolder>> cachedMusicFoldersPerUser = new ConcurrentHashMap<>();
     private RateLimiter downloadRateLimiter;
     private RateLimiter uploadRateLimiter;
     private Pattern excludePattern;
